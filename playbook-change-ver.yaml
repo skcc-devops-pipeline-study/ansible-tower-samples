@@ -159,7 +159,7 @@
       mode: '0755'
   
   - name: "Create a docker network"
-    docker_network:
+    community.docker.docker_network:
       name: "{{ item }}"
       state: present
     loop:
@@ -178,14 +178,14 @@
 
 # jenkins --- 실행 후 패스워드 확인 : docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
   - name: Down Jenkins Docker Compose stack
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/jenkins
       files:
       state: absent
       remove_volumes: yes 
 
   - name: deploy Jenkins Docker Compose stack
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/jenkins
       files:
       state: present
@@ -224,14 +224,14 @@
       replace: '    image: sonarqube:{{ sonarqube_ver }}'
 
   - name: Down SonarQube container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/sonarqube
       files:
       state: absent
       remove_volumes: yes 
 
   - name: Run SonarQube container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/sonarqube
       files:
       state: present    
@@ -277,7 +277,7 @@
 
 # Restart Harbor
   - name: Stop Harbor container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/harbor
       files:
       - docker-compose.yml
@@ -291,7 +291,7 @@
     when: not Ansible_First_Time | default(false)
 
   - name: Restart Harbor container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/harbor
       files:
       - docker-compose.yml
@@ -309,7 +309,7 @@
       replace: '    image: scouterapm/scouter-server:{{ scouter_ver }}'
 
   - name: Run Scouter container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/scouter
       files:
       - docker-compose.yml
@@ -317,7 +317,7 @@
       remove_volumes: yes 
 
   - name: Run Scouter container with docker-compose
-    docker_compose:
+    community.docker.docker_compose:
       project_src: /data/scouter
       files:
       - docker-compose.yml
