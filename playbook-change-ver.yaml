@@ -2,6 +2,9 @@
 - name: "Initialize instance for ansible"
   hosts: all
   become: true
+  collections:
+   - community.docker
+   
   vars:
     tools_server_eip: "{{ ansible_ec2_public_ipv4 }}"
 
