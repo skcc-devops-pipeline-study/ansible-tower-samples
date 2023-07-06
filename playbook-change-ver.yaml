@@ -1,0 +1,324 @@
+---
+- name: "Initialize instance for ansible"
+  hosts: all
+  become: true
+  vars:
+    tools_server_eip: "{{ ansible_ec2_public_ipv4 }}"
+
+    # As-Is Version
+    # jenkins_ver : "2.263.4-lts-jdk11"
+    # sonarqube_ver : "7.9.5-community"
+    # scouter_ver : "2.10.2"
+    # harbor_port: "8000"
+    
+    #To-Be Version
+    jenkins_ver : "lts"
+    sonarqube_ver : "lts-community"
+    scouter_ver : "2.8.1"
+    harbor_port: "8888"
+
+  tasks:
+  - name: "Gather EC2 Instance Metadata"
+    amazon.aws.ec2_metadata_facts: {}
+
+  - name: "Install pip"
+    apt:
+      name:
+      - "python3-pip"
+      - "python3-setuptools"
+      state: present
+      update_cache: yes
+
+  # - name: "Install Dependencies"
+  #   pip:
+  #     name:
+  #     - "virtualenv"
+  #     - "docker-compose"
+      # - "netaddr"
+
+  # - name: "Install Ansible"
+  #   pip:
+  #     name: ansible
+  #     version: "{{ ansible_install_version | default(omit) }}"
+  
+  - name: Create a "/data" directory if it does not exist
+    ansible.builtin.file:
+      path: /data/docker
+      state: directory
+
+  - name: Create a "/data" directory if it does not exist
+    ansible.builtin.file:
+      path: /data/{{ item }}
+      state: directory
+      owner: ubuntu
+      group: ubuntu
+      mode: '0755'
+      recurse: yes
+    loop:
+      - jenkins
+      - jenkins/jenkins_home
+      - jenkins/jenkins_docker_certs
+      - sonarqube
+      - scouter
+  
+  - name: Copy Docker Compose file
+    copy:
+      src: "{{ playbook_dir }}/files/{{ item }}/docker-compose.yml"
+      dest: /data/{{ item }}/
+    loop:
+      - jenkins
+      - sonarqube
+      - scouter
+
+  - name: Copy SonarQube Env.
+    copy:
+      src: "{{ playbook_dir }}/files/99-sonarqube.conf"
+      dest: /etc/security/limits.d/
+
+  - name: "Install common packages"
+    apt:
+      name:
+      - build-essential
+      - htop
+      - wget
+      - git
+      state: latest
+
+  - name: Install docker packages
+    apt:
+      name: 
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+      - gnupg
+      - lsb-release
+      state: present
+      update_cache: yes
+  
+  - name: Add Docker GPG apt Key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+  
+  - name: Verify gpg key with the fingerprint
+    apt_key:
+      id: 0EBFCD88
+      state: present
+      
+  - name: Add docker repository to apt
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+      state: present
+
+  - name: Update apt and install docker-ce
+    apt:
+      name: 
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      state: latest
+      update_cache: true
+
+  - name: Add user to docker group
+    user:
+      name: "ubuntu"
+      groups: docker
+      append: true
+
+  # 아래 필요한 경우를 대비
+  # - name: Install docker Python Package
+  #   pip:
+  #     name: 
+  #       - docker
+  #       - docker-compose
+  #     state: present
+  
+  - name: docker stop
+    command: sudo service docker stop
+    
+  - name: Copy Deamon.json
+    copy:
+      src: "{{ playbook_dir }}/files/deamon.json"
+      dest: /etc/docker/daemon.json 
+    when: Ansible_First_Time | default(false)
+
+  - name: Change Docker insecure-registry new IP for VM created
+    ansible.builtin.shell: |
+      sed -i 's/"insecure-registries" :.*/"insecure-registries" : ["{{ tools_server_eip }}:{{ harbor_port }}"]/g' /etc/docker/daemon.json
+
+  - name: docker start
+    command: sudo service docker start
+    
+  # shell : 디렉토리 생성 ( jenkins, sonarqube, harbor, scouter )
+  # docker command 로 network 생성( jenkins, sonarqube, harbor, scouter )
+  - name: Install docker-compose from official github repo
+    get_url:
+      url : https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64
+      dest: /usr/local/bin/docker-compose
+      mode: '0755'
+  
+  - name: "Create a docker network"
+    docker_network:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - jenkins-net
+      - sonarqube-net
+      - scouter-net
+  
+  - name: Change Jenkins Version
+    ansible.builtin.replace:
+      path: /data/jenkins/docker-compose.yml
+      after: '  jenkins:'
+      before: '    container_name: jenkins'
+      regexp: '^    image: jenkins/jenkins:(.+)$'
+      replace: '    image: jenkins/jenkins:{{ jenkins_ver }}'
+
+
+# jenkins --- 실행 후 패스워드 확인 : docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+  - name: Down Jenkins Docker Compose stack
+    docker_compose:
+      project_src: /data/jenkins
+      files:
+      state: absent
+      remove_volumes: yes 
+
+  - name: deploy Jenkins Docker Compose stack
+    docker_compose:
+      project_src: /data/jenkins
+      files:
+      state: present
+  
+#SonarQube ---
+  - name: Configraiton for SonarQube
+    ansible.builtin.shell: |
+      sysctl -w vm.max_map_count=262144
+      sysctl -w fs.file-max=65536
+      # ulimit -n 65536
+      # ulimit -u 4096
+    when: Ansible_First_Time | default(false)
+
+  - name: Config sysctl for SonarQube
+    sysctl:
+      name: vm.max_map_count
+      value: 262144
+      state: present      
+
+  - name: Config sysctl for SonarQube
+    sysctl:
+      name: fs.file-max
+      value: 65536
+      state: present
+
+  # - name: Change SonarQube Version
+  #   ansible.builtin.shell: |
+  #     sed -i 's/image: sonarqube:(.+)$/image: sonarqube:{{ sonarqube_ver }}/g' /data/sonarqube/docker-compose.yml
+
+  - name: Change SonarQube Version
+    ansible.builtin.replace:
+      path: /data/sonarqube/docker-compose.yml
+      after: '  sonarqube'
+      before: '    container_name: sonarqube'
+      regexp: '^    image: sonarqube:(.+)$'
+      replace: '    image: sonarqube:{{ sonarqube_ver }}'
+
+  - name: Down SonarQube container with docker-compose
+    docker_compose:
+      project_src: /data/sonarqube
+      files:
+      state: absent
+      remove_volumes: yes 
+
+  - name: Run SonarQube container with docker-compose
+    docker_compose:
+      project_src: /data/sonarqube
+      files:
+      state: present    
+  
+# Harbor ---
+  - name: Download Harbor install file from official github repo
+    get_url:
+      url : https://github.com/goharbor/harbor/releases/download/v2.2.0/harbor-online-installer-v2.2.0.tgz
+      dest: /data
+        
+  - name: Install Harbor at first time
+    ansible.builtin.shell: |
+      cd /data
+      # rm -rf harbor
+      tar xvf harbor-online-installer-v2.2.0.tgz
+      cd harbor
+      cp harbor.yml.tmpl harbor.yml
+      sed -i 's/hostname:.*/hostname: {{ tools_server_eip }}/g' /data/harbor/harbor.yml
+      sed -i 's/port: 80.*/port: {{ harbor_port }}/g' /data/harbor/harbor.yml
+      sed -i 's/port: 443*/#port: 443/g' /data/harbor/harbor.yml
+      sed -i 's/certificate:.*/#certificate:/g' /data/harbor/harbor.yml
+      sed -i 's/private_key:.*/#private_key:/g' /data/harbor/harbor.yml
+      sed -i 's/data_volume:.*/data_volume: \/data\/harbor\/data/g' /data/harbor/harbor.yml
+      sudo ./install.sh
+    when: Ansible_First_Time | default(false)
+
+# Change configuration for Harbor when new VM Instance Created
+  - name: Update hostname new IP for harbor
+    ansible.builtin.replace:
+      path: /data/harbor/harbor.yml
+      regexp: 'hostname: (.+)$'
+      replace: 'hostname: {{ tools_server_eip }}'
+    when: not Ansible_First_Time | default(false)      
+  
+  - name: Update Harbor port
+    ansible.builtin.replace:
+      path: /data/harbor/harbor.yml
+      after: '# http related config'
+      before: '# https related config'
+      regexp: '^  port:(.+)$'
+      replace: '  port: {{ harbor_port }}'
+    when: not Ansible_First_Time | default(false)
+
+# Restart Harbor
+  - name: Stop Harbor container with docker-compose
+    docker_compose:
+      project_src: /data/harbor
+      files:
+      - docker-compose.yml
+      state: absent  
+    when: not Ansible_First_Time | default(false)
+
+  - name: Prepare Harbor
+    ansible.builtin.shell:
+      cmd: ./prepare
+      chdir: /data/harbor
+    when: not Ansible_First_Time | default(false)
+
+  - name: Restart Harbor container with docker-compose
+    docker_compose:
+      project_src: /data/harbor
+      files:
+      - docker-compose.yml
+      state: present  
+      # restarted: yes
+    when: not Ansible_First_Time | default(false)
+
+# Install Scouter
+  - name: Change Scouter Version
+    ansible.builtin.replace:
+      path: /data/scouter/docker-compose.yml
+      after: '  scouter:'
+      before: '    restart : always'
+      regexp: '^    image : (.+)$'
+      replace: '    image: scouterapm/scouter-server:{{ scouter_ver }}'
+
+  - name: Run Scouter container with docker-compose
+    docker_compose:
+      project_src: /data/scouter
+      files:
+      - docker-compose.yml
+      state: absent 
+      remove_volumes: yes 
+
+  - name: Run Scouter container with docker-compose
+    docker_compose:
+      project_src: /data/scouter
+      files:
+      - docker-compose.yml
+      state: present    
