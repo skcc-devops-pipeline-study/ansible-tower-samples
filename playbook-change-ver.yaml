@@ -73,10 +73,10 @@
   #     - sonarqube
   #     - scouter
 
-  - name: Copy SonarQube Env.
-    copy:
-      src: "{{ playbook_dir }}/files/99-sonarqube.conf"
-      dest: /etc/security/limits.d/
+  # - name: Copy SonarQube Env.
+  #   copy:
+  #     src: "{{ playbook_dir }}/files/99-sonarqube.conf"
+  #     dest: /etc/security/limits.d/
 
   - name: "Install common packages"
     apt:
