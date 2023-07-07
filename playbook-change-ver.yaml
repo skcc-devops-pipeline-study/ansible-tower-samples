@@ -64,14 +64,14 @@
       - sonarqube
       - scouter
   
-  - name: Copy Docker Compose file
-    copy:
-      src: "{{ playbook_dir }}/files/{{ item }}/docker-compose.yml"
-      dest: /data/{{ item }}/
-    loop:
-      - jenkins
-      - sonarqube
-      - scouter
+  # - name: Copy Docker Compose file
+  #   copy:
+  #     src: "{{ playbook_dir }}/files/{{ item }}/docker-compose.yml"
+  #     dest: /data/{{ item }}/
+  #   loop:
+  #     - jenkins
+  #     - sonarqube
+  #     - scouter
 
   - name: Copy SonarQube Env.
     copy:
@@ -140,11 +140,11 @@
   - name: docker stop
     command: sudo service docker stop
     
-  - name: Copy Deamon.json
-    copy:
-      src: "{{ playbook_dir }}/files/deamon.json"
-      dest: /etc/docker/daemon.json 
-    when: Ansible_First_Time | default(false)
+  # - name: Copy Deamon.json
+  #   copy:
+  #     src: "{{ playbook_dir }}/files/deamon.json"
+  #     dest: /etc/docker/daemon.json 
+  #   when: Ansible_First_Time | default(false)
 
   - name: Change Docker insecure-registry new IP for VM created
     ansible.builtin.shell: |
