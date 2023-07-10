@@ -64,12 +64,12 @@
       - sonarqube
       - scouter
   
-  # - name: Copy Docker Compose file
-  #   copy:
-  #     src: "{{ playbook_dir }}/files/{{ item }}/docker-compose.yml"
-  #     dest: /data/{{ item }}/
-  #   loop:
-  #     - jenkins
+  - name: Copy Docker Compose file
+    copy:
+      src: "{{ playbook_dir }}/files/{{ item }}/docker-compose.yml"
+      dest: /data/{{ item }}/
+    loop:
+      - jenkins
   #     - sonarqube
   #     - scouter
 
