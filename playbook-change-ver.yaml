@@ -1,6 +1,6 @@
 ---
 - name: "Initialize instance for ansible"
-  hosts: all
+  hosts: iac_tools
   become: true
   collections:
    - community.docker
