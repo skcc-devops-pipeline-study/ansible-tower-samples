@@ -9,16 +9,16 @@
     tools_server_eip: "{{ ansible_ec2_public_ipv4 }}"
 
     # As-Is Version
-    # jenkins_ver : "2.263.4-lts-jdk11"
-    # sonarqube_ver : "7.9.5-community"
-    # scouter_ver : "2.10.2"
-    # harbor_port: "8000"
+    jenkins_ver : "2.263.4-lts-jdk11"
+    sonarqube_ver : "7.9.5-community"
+    scouter_ver : "2.10.2"
+    harbor_port: "8000"
     
     #To-Be Version
-    jenkins_ver : "lts"
-    sonarqube_ver : "lts-community"
-    scouter_ver : "2.8.1"
-    harbor_port: "8888"
+    # jenkins_ver : "lts"
+    # sonarqube_ver : "lts-community"
+    # scouter_ver : "2.8.1"
+    # harbor_port: "8888"
 
   tasks:
   - name: "Gather EC2 Instance Metadata"
