@@ -1,5 +1,5 @@
 - name: Hello World Sample
-  hosts: all
+  hosts: ubuntu
   tasks:
     - name: Hello Message
       debug:
